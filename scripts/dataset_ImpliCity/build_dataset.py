@@ -205,6 +205,12 @@ def is_under_dsm(points, dsm: RasterReader):
     is_under = points[:, 2] <= dsm_value
     return is_under
 
+
+def get_dsm_value(points, dsm: RasterReader):
+    dsm_value = dsm.query_value_3d_points(points)
+    return dsm_value
+
+
 # %% Main part
 # initialize
 chunk_safe_padding = cfg_chunk['chunk_safe_padding']
@@ -340,28 +346,56 @@ for _chunk_idx in tqdm(chunks.keys(), desc="Chunks"):
             if n_pts > 0:
                 # Occupancy
                 MAX_OCC_PATCH = 2000000  # due to the limit of check_mesh_contains()
-                occ_udsm_ls = []  # under GT DSM
-                occ_ug_ls = []  # underground
+
+            # quick experiment to test regression
+            #     occ_udsm_ls = []  # under GT DSM
+                dsm_height_ls = []  # height values
                 for pts in tqdm(np.array_split(query_pts, np.ceil(n_pts / MAX_OCC_PATCH)),
                                 desc=f"Calculating occupancy ({n_pts} points)", leave=False, position=2):
-                    _occ_udsm = is_under_dsm(pts, dsm_gt)
-                    _occ_ug = check_under_mesh(mesh_terrain_pymesh, pts)
-                    occ_udsm_ls.append(_occ_udsm)
-                    occ_ug_ls.append(_occ_ug)
-                occ_udsm = np.concatenate(occ_udsm_ls)
-                occ_ug = np.concatenate(occ_ug_ls, 0)
-                occ_build = occ_udsm & ~occ_ug
+                    # _occ_udsm = is_under_dsm(pts, dsm_gt)
+                    _height = get_dsm_value(pts, dsm_gt)
+                    # _occ_ug = check_under_mesh(mesh_terrain_pymesh, pts)
+                    # occ_udsm_ls.append(_occ_udsm)
+                    dsm_height_ls.append(_height)
+                dsm_height = np.concatenate(dsm_height_ls)
+                # occ_udsm = np.concatenate(occ_udsm_ls)
+                # occ_ug = np.concatenate(dsm_height_ls, 0)
+                # occ_build = occ_udsm & ~occ_ug
                 # occ label
-                occ_label = np.zeros(occ_build.shape)
-                occ_label[occ_build] = 1
-                occ_label[occ_udsm & ~occ_build] = 2
+                height_label = np.zeros(dsm_height.shape)
+                # occ_label[occ_build] = 1
+                # occ_label[occ_udsm & ~occ_build] = 2
             else:
-                occ_label = np.empty(0)
+                height_label = np.empty(0)
 
             _out_data = {
                 'pts': query_pts,
-                'occ': occ_label.astype(int)
+                # 'occ': occ_label.astype(int)
+                'height': height_label.astype(float)
             }
+
+            #     occ_udsm_ls = []  # under GT DSM
+            #     occ_ug_ls = []  # underground
+            #     for pts in tqdm(np.array_split(query_pts, np.ceil(n_pts / MAX_OCC_PATCH)),
+            #                     desc=f"Calculating occupancy ({n_pts} points)", leave=False, position=2):
+            #         _occ_udsm = is_under_dsm(pts, dsm_gt)
+            #         _occ_ug = check_under_mesh(mesh_terrain_pymesh, pts)
+            #         occ_udsm_ls.append(_occ_udsm)
+            #         occ_ug_ls.append(_occ_ug)
+            #     occ_udsm = np.concatenate(occ_udsm_ls)
+            #     occ_ug = np.concatenate(occ_ug_ls, 0)
+            #     occ_build = occ_udsm & ~occ_ug
+            #     # occ label
+            #     occ_label = np.zeros(occ_build.shape)
+            #     occ_label[occ_build] = 1
+            #     occ_label[occ_udsm & ~occ_build] = 2
+            # else:
+            #     occ_label = np.empty(0)
+            #
+            # _out_data = {
+            #     'pts': query_pts,
+            #     'occ': occ_label.astype(int)
+            # }
 
             # Mask
             for mask in tqdm(mask_keys, desc="Calculating masks", leave=False, position=2):
@@ -382,7 +416,7 @@ for _chunk_idx in tqdm(chunks.keys(), desc="Chunks"):
             if save_vis:
                 if n_pts > 0:
                     for label in [0, 1, 2]:
-                        _occ = (label == occ_label).astype(bool)
+                        _occ = (label == height_label).astype(bool)
                         pts_to_save = query_pts[_occ]
                         save_pc_to_ply(os.path.join(vis_dir, f"{chunk_name}-{query_type}-occ={label}.ply"), pts_to_save)
                 else:

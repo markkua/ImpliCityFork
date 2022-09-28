@@ -134,35 +134,68 @@ class ImpliCityDataset(data.Dataset):
             }
 
             # query points
+
+            # quick experiment: test regression
             if self.split in ['train', 'val']:
                 query_types = ['uniform']
                 use_surface = self._cfg_data['use_surface']
                 if use_surface is not None:
                     query_types.extend(use_surface)
                 query_pts_ls: List = []
-                query_occ_ls: List = []
+                query_h_ls: List = []
                 masks_ls: Dict[str, List] = {f'mask_{_m}': [] for _m in ['gt', 'building', 'forest', 'water']}
                 for surface_type in query_types:
                     file_path = os.path.join(chunk_full_path, self.QUERY_POINTS % surface_type)
                     _loaded = np.load(file_path)
                     query_pts_ls.append(_loaded['pts'])
-                    query_occ_ls.append(_loaded['occ'])
+                    query_h_ls.append(_loaded['height'])
+                    # query_occ_ls.append(_loaded['occ'])
                     for _m in masks_ls.keys():  # e.g. mask_gt
                         masks_ls[_m].append(_loaded[_m])
                 query_pts: np.ndarray = np.concatenate(query_pts_ls, 0)
-                query_occ: np.ndarray = np.concatenate(query_occ_ls, 0)
+                query_h: np.ndarray = np.concatenate(query_h_ls, 0)
+                # query_occ: np.ndarray = np.concatenate(query_occ_ls, 0)
                 masks: Dict[str, np.ndarray] = {_m: np.concatenate(masks_ls[_m], 0) for _m in masks_ls.keys()}
-                if merge_query_occ:
-                    query_occ = (query_occ > 0).astype(bool)
-                del query_pts_ls, query_occ_ls, masks_ls
+                del query_pts_ls, query_h_ls, masks_ls
                 chunk_data.update({
                     'query_pts': torch.from_numpy(query_pts).double(),
-                    'query_occ': torch.from_numpy(query_occ).float(),
+                    'query_h': torch.from_numpy(query_h).float(),
                     'mask_gt': torch.from_numpy(masks['mask_gt']).bool(),
                     'mask_building': torch.from_numpy(masks['mask_building']).bool(),
                     'mask_forest': torch.from_numpy(masks['mask_forest']).bool(),
                     'mask_water': torch.from_numpy(masks['mask_water']).bool(),
                 })
+
+
+            # if self.split in ['train', 'val']:
+            #     query_types = ['uniform']
+            #     use_surface = self._cfg_data['use_surface']
+            #     if use_surface is not None:
+            #         query_types.extend(use_surface)
+            #     query_pts_ls: List = []
+            #     query_occ_ls: List = []
+            #     masks_ls: Dict[str, List] = {f'mask_{_m}': [] for _m in ['gt', 'building', 'forest', 'water']}
+            #     for surface_type in query_types:
+            #         file_path = os.path.join(chunk_full_path, self.QUERY_POINTS % surface_type)
+            #         _loaded = np.load(file_path)
+            #         query_pts_ls.append(_loaded['pts'])
+            #         query_occ_ls.append(_loaded['occ'])
+            #         for _m in masks_ls.keys():  # e.g. mask_gt
+            #             masks_ls[_m].append(_loaded[_m])
+            #     query_pts: np.ndarray = np.concatenate(query_pts_ls, 0)
+            #     query_occ: np.ndarray = np.concatenate(query_occ_ls, 0)
+            #     masks: Dict[str, np.ndarray] = {_m: np.concatenate(masks_ls[_m], 0) for _m in masks_ls.keys()}
+            #     if merge_query_occ:
+            #         query_occ = (query_occ > 0).astype(bool)
+            #     del query_pts_ls, query_occ_ls, masks_ls
+            #     chunk_data.update({
+            #         'query_pts': torch.from_numpy(query_pts).double(),
+            #         'query_occ': torch.from_numpy(query_occ).float(),
+            #         'mask_gt': torch.from_numpy(masks['mask_gt']).bool(),
+            #         'mask_building': torch.from_numpy(masks['mask_building']).bool(),
+            #         'mask_forest': torch.from_numpy(masks['mask_forest']).bool(),
+            #         'mask_water': torch.from_numpy(masks['mask_water']).bool(),
+            #     })
 
             self.data_dic[chunk_idx] = chunk_data
 

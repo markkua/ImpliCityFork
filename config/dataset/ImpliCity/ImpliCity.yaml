@@ -3,8 +3,8 @@ inherit_from: config/dataset/ImpliCity/ImpliCity_base.yaml
 
 # Output
 output:
-  output_folder: /scratch3/Data/ImpliCity_Intermediate_Data/ImpliCity
-  save_visualization_pc: True
+  output_folder: /scratch2/Data/ImpliCity_Intermediate_Data/ImpliCity_Height
+  save_visualization_pc: False
 
 # Query points (num per patch(slide window))
 query_points:
