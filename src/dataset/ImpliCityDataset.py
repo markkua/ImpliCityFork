@@ -381,11 +381,17 @@ class ImpliCityDataset(data.Dataset):
                 _idx = np.random.choice(points_idx.shape[0], self._n_query_pts)
                 points_norm = points_norm[_idx]
                 points_idx = points_idx[_idx]
+
+            # Normalize height labels
+            z_shift = transform_mat[2, 3].item()
+            query_h = chunk_data['query_h'][points_idx].float()
+            h_norm = (query_h - z_shift) / self.z_std
+
             # points = chunk_data['query_pts'][points_idx]
             # print(points.shape)
 
             out_data['query_pts'] = points_norm
-            out_data['query_h'] = chunk_data['query_h'][points_idx].float()
+            out_data['query_h'] = h_norm
             # out_data['query_occ'] = chunk_data['query_occ'][points_idx].float()
             # assign occ and mask_land
             for _m in ['mask_gt', 'mask_building', 'mask_forest', 'mask_water']:

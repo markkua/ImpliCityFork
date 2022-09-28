@@ -357,16 +357,15 @@ for _chunk_idx in tqdm(chunks.keys(), desc="Chunks"):
                     # _occ_ug = check_under_mesh(mesh_terrain_pymesh, pts)
                     # occ_udsm_ls.append(_occ_udsm)
                     dsm_height_ls.append(_height)
-                dsm_height = np.concatenate(dsm_height_ls)
+                height_label = np.concatenate(dsm_height_ls)
                 # occ_udsm = np.concatenate(occ_udsm_ls)
                 # occ_ug = np.concatenate(dsm_height_ls, 0)
                 # occ_build = occ_udsm & ~occ_ug
                 # occ label
-                height_label = np.zeros(dsm_height.shape)
                 # occ_label[occ_build] = 1
                 # occ_label[occ_udsm & ~occ_build] = 2
             else:
-                height_label = np.empty(0)
+                height_label = np.zeros(dsm_height.shape)
 
             _out_data = {
                 'pts': query_pts,
