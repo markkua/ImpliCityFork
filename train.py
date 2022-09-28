@@ -332,7 +332,7 @@ try:
                 wdb_dic = {
                     'iteration': n_iter,
                     'train/loss': loss,
-                    'lr': scheduler.get_last_lr()[0],
+                    'lr': scheduler.get_last_lr()[-1],
                     'misc/training_time': training_time.total_seconds(),
                     'misc/n_query_points': trainer.last_avg_n_pts
                     # 'epoch': n_epoch
