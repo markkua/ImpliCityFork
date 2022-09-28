@@ -1,9 +1,9 @@
 # Basic info
-inherit_from: config/data/ImpliCity/ImpliCity_base.yaml
+inherit_from: config/dataset/ImpliCity/ImpliCity_base.yaml
 
 # Output
 output:
-  output_folder: data/ImpliCity
+  output_folder: /scratch3/Data/ImpliCity_Intermediate_Data/ImpliCity
   save_visualization_pc: True
 
 # Query points (num per patch(slide window))

@@ -188,9 +188,3 @@ If you find our code or work useful, please cite:
 }
 ```
 
-## Acknowledgements
-In this project we use (parts of) the official implementations of the following works:
-- [ConvONet](https://github.com/autonomousvision/convolutional_occupancy_networks)
-- [PIFu](https://github.com/shunsukesaito/PIFu)
-
-We thank the respective authors for open sourcing and maintenance.

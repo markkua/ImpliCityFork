@@ -40,7 +40,7 @@ try:
     from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
     from yaml import Loader, Dumper
-import pymesh
+import pymesh  # pymesh2
 from pymesh import Mesh as PyMesh
 from tqdm import tqdm
 import trimesh

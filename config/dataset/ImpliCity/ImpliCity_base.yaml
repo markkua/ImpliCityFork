@@ -3,7 +3,7 @@
 
 dataset: ImpliCity_base
 build_training_data: true
-gt_mesh_folder: data/source_data/ZUR1/Ground_Truth_3D
+gt_mesh_folder: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Ground_Truth_3D
 gt_mesh_files:
   roof: LOD2_DACH_ZUR1.obj  # roof
   facade: LOD2_WAND_ZUR1.obj  # facade
@@ -12,18 +12,18 @@ gt_mesh_files:
   gt: merged_dach_wand_terrain.obj
   buildings: merged_buildings.obj
 mask_files:
-  gt: data/source_data/ZUR1/Masks/Zurich_ROI1_ground_truth_mask_UTM_32N.tif
-  building: data/source_data/ZUR1/Masks/Zurich_ROI1_building_mask_UTM_32N.tif
-  forest: data/source_data/ZUR1/Masks/Zurich_ROI1_forest_mask_UTM_32N.tif
-  water: data/source_data/ZUR1/Masks/Zurich_ROI1_water_mask_UTM_32N.tif
+  gt: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Masks/Zurich_ROI1_ground_truth_mask_UTM_32N.tif
+  building: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Masks/Zurich_ROI1_building_mask_UTM_32N.tif
+  forest: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Masks/Zurich_ROI1_forest_mask_UTM_32N.tif
+  water: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Masks/Zurich_ROI1_water_mask_UTM_32N.tif
 out_of_mask_value: 0  # mask value out of mask area
 dilate_building: 8  # dilate 8 pixels (2m)
-input_pointcloud_folder: data/source_data/ZUR1/Point_Clouds
-gt_dsm: data/source_data/ZUR1/Ground_Truth_2.5D/Zurich_ROI1_GT_UTM_32N_ellipsoidal_h_GRS80.tif
+input_pointcloud_folder: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Point_Clouds
+gt_dsm: /scratch3/Data/ImpliCity_Raw_Data/ZUR1/Ground_Truth_2.5D/Zurich_ROI1_GT_UTM_32N_ellipsoidal_h_GRS80.tif
 
 # Output
 output:
-  output_folder: data/ImpliCity_base
+  output_folder: /scratch3/Data/ImpliCity_Intermediate_Data/ImpliCity_base
   save_visualization_pc: True  # save point clouds as separate .ply file
 
 lock_seed: True
