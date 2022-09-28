@@ -385,7 +385,8 @@ class ImpliCityDataset(data.Dataset):
             # print(points.shape)
 
             out_data['query_pts'] = points_norm
-            out_data['query_occ'] = chunk_data['query_occ'][points_idx].float()
+            out_data['query_h'] = chunk_data['query_h'][points_idx].float()
+            # out_data['query_occ'] = chunk_data['query_occ'][points_idx].float()
             # assign occ and mask_land
             for _m in ['mask_gt', 'mask_building', 'mask_forest', 'mask_water']:
                 out_data[_m] = chunk_data[_m][points_idx]

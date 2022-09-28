@@ -15,8 +15,23 @@ model:
     in_channel: 2  # num of input images (correspond to dataset)
 
 training:
-  run_name: ImpliCity-stereo
+  run_name: ImpliCity-stereo_regress_MAE
+  loss: MAE
+  pretrained_encoder: True
+  resume_scheduler: False
   resume_from: data/ImpliCity_demo/model/ImpliCity-stereo_pretrained.pt
+  learning_rate: 0.001
+  scheduler:
+    type: MultiStepLR
+    kwargs:
+      gamma: 0.5
+      milestones: [1000, 2000, 3000]
+
+  visualize_every: 100
+  save_vis_every: 100
+  validate_every: 200
+  checkpoint_every: 50
+  backup_every: 1000
 
 test:
   check_point: data/ImpliCity_demo/model/ImpliCity-stereo_pretrained.pt

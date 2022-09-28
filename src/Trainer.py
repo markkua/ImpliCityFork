@@ -55,11 +55,15 @@ class Trainer:
         self.loss_weights_gt = self.cfg_loss_weights['gt']
 
         # binary metrics
-        self.binary_metrics = {
-            'accuracy': Accuracy(n_class=self.n_classes),
-            'precision': Precision(n_class=self.n_classes),
-            'recall': Recall(n_class=self.n_classes),
-            # 'F1-score': lambda a, b: f1_score(a, b, average='binary'),
+        # self.binary_metrics = {
+        #     'accuracy': Accuracy(n_class=self.n_classes),
+        #     'precision': Precision(n_class=self.n_classes),
+        #     'recall': Recall(n_class=self.n_classes),
+        #     # 'F1-score': lambda a, b: f1_score(a, b, average='binary'),
+        # }
+
+        # regression metrics
+        self.regression_metrics = {
         }
 
         # gradient accumulation
@@ -77,9 +81,9 @@ class Trainer:
             for key in self.multi_tower_weights.keys():
                 self.acc_loss_category[key] = 0.
         self.last_avg_loss_category = defaultdict(float)
-        self.acc_metrics_total: Dict = {key: 0. for key in self.binary_metrics.keys()}
+        self.acc_metrics_total: Dict = {key: 0. for key in self.regression_metrics.keys()}
         self.last_avg_metrics_total = defaultdict(float)
-        self.acc_metrics_category: Dict = {f'{metric}/{cat}': 0. for metric in self.binary_metrics.keys() for cat in LAND_TYPES}
+        self.acc_metrics_category: Dict = {f'{metric}/{cat}': 0. for metric in self.regression_metrics.keys() for cat in LAND_TYPES}
         self.last_avg_metrics_category: Dict = defaultdict(float)
 
     def train_step(self, data):
@@ -90,7 +94,8 @@ class Trainer:
         """
         device = self.device
         query_pts: torch.Tensor = data.get('query_pts').to(device)
-        query_occ: torch.Tensor = data.get('query_occ').to(device)
+        query_h: torch.Tensor = data.get('query_h').to(device)
+        # query_occ: torch.Tensor = data.get('query_occ').to(device)
         inputs = data.get('inputs').to(device)
 
         # mask_land
@@ -103,11 +108,13 @@ class Trainer:
 
         if isinstance(self.model, ConvolutionalOccupancyNetwork):
             pred = self.model.forward(p=query_pts, inputs=inputs)
-            loss_i = self.loss_func(pred.squeeze(), query_occ.squeeze())
+            # loss_i = self.loss_func(pred.squeeze(), query_occ.squeeze())
+            loss_i = self.loss_func(pred.squeeze(), query_h.squeeze())
         elif isinstance(self.model, ImpliCityONet):
             input_img: torch.Tensor = data.get('image').to(device)
             pred = self.model.forward(p=query_pts, input_pc=inputs, input_img=input_img)
-            loss_i = self.loss_func(pred.squeeze(), query_occ.squeeze())
+            # loss_i = self.loss_func(pred.squeeze(), query_occ.squeeze())
+            loss_i = self.loss_func(pred.squeeze(), query_h.squeeze())
         # elif isinstance(self.model, CityConvONetMultiTower):
         #     input_img: torch.Tensor = data.get('image').to(device)
         #     pred_dict = self.model.forward_multi_tower(p=query_pts, input_pc=inputs, input_img=input_img)
@@ -135,14 +142,15 @@ class Trainer:
 
         with torch.no_grad():
             # prediction label
-            pred_occ: torch.Tensor = self.model.pred2occ(pred)
+            # pred_occ: torch.Tensor = self.model.pred2occ(pred)
 
             # Other metrics
-            for met_key, func in self.binary_metrics.items():
-                self.acc_metrics_total[met_key] += func(pred_occ, query_occ)
+            # for met_key, func in self.binary_metrics.items():
+            for met_key, func in self.regression_metrics.items():
+                self.acc_metrics_total[met_key] += func(pred, query_h)
                 for cat_key in LAND_TYPES:
                     mask = mask_land[cat_key]
-                    _metric = func(pred_occ[mask], query_occ[mask])
+                    _metric = func(pred[mask], query_h[mask])
                     self.acc_metrics_category[f'{met_key}/{cat_key}'] += _metric
 
         # gradient accumulation
@@ -155,7 +163,8 @@ class Trainer:
                                                in self.acc_loss_category.keys()}
                 self.acc_loss_category = {key: 0. for key in self.acc_loss_category.keys()}
                 # other metrics
-                for met_key in self.binary_metrics.keys():
+                # for met_key in self.binary_metrics.keys():
+                for met_key in self.regression_metrics.keys():
                     self.last_avg_metrics_total[met_key] = self.acc_metrics_total[met_key] / self.optimize_every
                     self.acc_metrics_total[met_key] = 0
                 for _key, value in self.acc_metrics_category.items():
@@ -231,7 +240,8 @@ class Trainer:
         eval_dict = {}
 
         query_pts: torch.Tensor = data.get('query_pts').to(device)
-        query_occ: torch.Tensor = data.get('query_occ').to(device)
+        query_h: torch.Tensor = data.get('query_h').to(device)
+        # query_occ: torch.Tensor = data.get('query_occ').to(device)
         inputs = data.get('inputs').to(device)
 
         eval_dict['n_query_points'] = float(query_pts.shape[1])
@@ -245,11 +255,11 @@ class Trainer:
         with torch.no_grad():
             if isinstance(self.model, ConvolutionalOccupancyNetwork):
                 pred = self.model.forward(p=query_pts, inputs=inputs)
-                loss_i = self.loss_func(pred.squeeze(), query_occ.squeeze())
+                loss_i = self.loss_func(pred.squeeze(), query_h.squeeze())
             elif isinstance(self.model, ImpliCityONet):
                 input_img: torch.Tensor = data.get('image').to(device)
                 pred = self.model.forward(p=query_pts, input_pc=inputs, input_img=input_img)
-                loss_i = self.loss_func(pred.squeeze(), query_occ.squeeze())
+                loss_i = self.loss_func(pred.squeeze(), query_h.squeeze())
             # elif isinstance(self.model, CityConvONetMultiTower):
             #     input_img: torch.Tensor = data.get('image').to(device)
             #     pred_dict = self.model.forward_multi_tower(p=query_pts, input_pc=inputs, input_img=input_img)
@@ -273,19 +283,19 @@ class Trainer:
                 eval_dict[f'loss/{_key}'] = _value
 
             # prediction label
-            pred_occ: torch.Tensor = self.model.pred2occ(pred)
+            # pred_occ: torch.Tensor = self.model.pred2occ(pred)
 
             # Other metrics
-            for key, func in self.binary_metrics.items():
-                eval_dict[key] = func(pred_occ, query_occ)
+            for key, func in self.regression_metrics.items():
+                eval_dict[key] = func(pred, query_h)
                 for cat_key in LAND_TYPES:
                     mask = mask_land[cat_key]
-                    _metric = func(pred_occ[mask], query_occ[mask])
+                    _metric = func(pred[mask], query_h[mask])
                     eval_dict[f'{key}/{cat_key}'] = _metric
 
             # compute IoU (intersection over union)
-            occ_iou_gt_np = query_occ.cpu().numpy()
-            occ_iou_hat_np = pred_occ.cpu().numpy()
-            iou = compute_iou(occ_iou_gt_np, occ_iou_hat_np)
-            eval_dict['iou'] = iou
+            # occ_iou_gt_np = query_h.cpu().numpy()
+            # occ_iou_hat_np = query_h.cpu().numpy()
+            # iou = compute_iou(occ_iou_gt_np, occ_iou_hat_np)
+            # eval_dict['iou'] = iou
         return eval_dict

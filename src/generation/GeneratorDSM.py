@@ -68,7 +68,8 @@ class DSMGenerator:
         self.dsm_shape = RasterWriter.cal_dsm_shape([self.l_bound, self.b_bound], [self.r_bound, self.t_bound],
                                                     self.pixel_size)
 
-        self._default_query_grid = self._generate_query_grid().to(self.device)
+        # self._default_query_grid = self._generate_query_grid().to(self.device)
+        self._default_query_grid = self._generate_query_raster().to(self.device)
         self._default_true = torch.ones(self._default_query_grid.shape[:2]).bool().to(self.device)
         self._default_false = torch.zeros(self._default_query_grid.shape[:2]).bool().to(self.device)
 
@@ -76,18 +77,32 @@ class DSMGenerator:
                                                             self.half_blend_percent).to(self.device)
         assert torch.float64 == self.patch_weight.dtype
 
-    def _generate_query_grid(self):
-        pzs = torch.arange(self.h_range[0].item(), self.h_range[1].item(), self.h_res_0) / self.z_scale
+    # def _generate_query_grid(self):
+    #     pzs = torch.arange(self.h_range[0].item(), self.h_range[1].item(), self.h_res_0) / self.z_scale
+    #
+    #     _grid_xy_shape = torch.round(self.patch_size / self.pixel_size).long()
+    #     shape = [_grid_xy_shape[0].item(), _grid_xy_shape[1].item(), pzs.shape[0]]
+    #     _size = shape[0] * shape[1] * shape[2]
+    #     pxs = torch.linspace(0., 1., _grid_xy_shape[0].item())
+    #     pys = torch.linspace(1., 0., _grid_xy_shape[1].item())
+    #
+    #     pxs = pxs.reshape((1, -1, 1)).expand(*shape)
+    #     pys = pys.reshape((-1, 1, 1)).expand(*shape)
+    #     pzs = pzs.reshape((1, 1, -1)).expand(*shape)
+    #
+    #     query_grid = torch.stack([pxs, pys, pzs], dim=3)
+    #     return query_grid
 
+    def _generate_query_raster(self):
         _grid_xy_shape = torch.round(self.patch_size / self.pixel_size).long()
-        shape = [_grid_xy_shape[0].item(), _grid_xy_shape[1].item(), pzs.shape[0]]
+        shape = [_grid_xy_shape[0].item(), _grid_xy_shape[1].item(), 1]
         _size = shape[0] * shape[1] * shape[2]
         pxs = torch.linspace(0., 1., _grid_xy_shape[0].item())
         pys = torch.linspace(1., 0., _grid_xy_shape[1].item())
 
         pxs = pxs.reshape((1, -1, 1)).expand(*shape)
         pys = pys.reshape((-1, 1, 1)).expand(*shape)
-        pzs = pzs.reshape((1, 1, -1)).expand(*shape)
+        pzs = torch.ones(1).reshape((1, 1, -1)).expand(*shape)
 
         query_grid = torch.stack([pxs, pys, pzs], dim=3)
         return query_grid
@@ -122,7 +137,7 @@ class DSMGenerator:
         weight_tensor = weight_tensor_x * weight_tensor_y
         return weight_tensor
 
-    def generate_dsm(self, save_to: str):
+    def generate_dsm(self):
         """ assume height > 0 ? """
         device = self.device
         patch_weight = self.patch_weight.detach().to(device)
@@ -207,7 +222,6 @@ class DSMGenerator:
 
         tiff_data.set_data(dsm_tensor, 1)
         tiff_writer = RasterWriter(tiff_data)
-        tiff_writer.write_to_file(save_to)
         return tiff_writer
 
     def _query_patch_dsm(self, data, query_grid):
@@ -228,44 +242,51 @@ class DSMGenerator:
                 raise NotImplemented
             c = self.model.encode_inputs(inputs, **kwargs)
             kwargs = {}
-            for i in range(self.upsample_steps+1):
-                query_p = query_grid.reshape((-1, 3)).to(device)
-                occ = self._eval_points(query_p, c, **kwargs)
 
-                # occ grid
-                occ = occ.reshape(query_grid.shape[:3])
-                occupied_h_grid = (query_grid[:, :, :, 2] + self.DEFAULT_SHIFT_H) * occ - self.DEFAULT_SHIFT_H
-                largest_h_grid = occupied_h_grid.max(2).values.reshape(query_grid.shape[:2], 1)
+            query_p = query_grid.reshape((-1, 3)).to(device)
+            pred_h = self._eval_points(query_p, c, **kwargs)
+            largest_h_grid = pred_h.reshape(query_grid.shape[:2], 1)
 
-                # if self.fill_empty:
-                is_empty = is_empty | torch.where(largest_h_grid <= -self.DEFAULT_SHIFT_H,
-                                                  self._default_true, self._default_false)
-                largest_h_grid = largest_h_grid * ~is_empty
 
-                if i < self.upsample_steps:
-                    current_h_res = current_h_res / 4
-                    delta_h = torch.tensor(
-                        [-current_h_res, 0, current_h_res, current_h_res * 2, current_h_res * 3]).reshape((-1, 1))\
-                        .to(device)
-                    expanded = largest_h_grid.reshape((*shape[:2], 1, 1)).expand((*shape[:2], len(delta_h), 1))
-                    expanded = expanded + delta_h
-                    query_grid = torch.cat([
-                        query_grid[:, :, 0:1, 0:1].expand((*shape[:2], len(delta_h), 1)),
-                        query_grid[:, :, 0:1, 1:2].expand((*shape[:2], len(delta_h), 1)),
-                        expanded
-                    ], 3)
+            # for i in range(self.upsample_steps+1):
+            #     query_p = query_grid.reshape((-1, 3)).to(device)
+            #     occ = self._eval_points(query_p, c, **kwargs)
+            #
+            #     # occ grid
+            #     occ = occ.reshape(query_grid.shape[:3])
+            #     occupied_h_grid = (query_grid[:, :, :, 2] + self.DEFAULT_SHIFT_H) * occ - self.DEFAULT_SHIFT_H
+            #     largest_h_grid = occupied_h_grid.max(2).values.reshape(query_grid.shape[:2], 1)
+            #
+            #     # if self.fill_empty:
+            #     is_empty = is_empty | torch.where(largest_h_grid <= -self.DEFAULT_SHIFT_H,
+            #                                       self._default_true, self._default_false)
+            #     largest_h_grid = largest_h_grid * ~is_empty
+            #
+            #     if i < self.upsample_steps:
+            #         current_h_res = current_h_res / 4
+            #         delta_h = torch.tensor(
+            #             [-current_h_res, 0, current_h_res, current_h_res * 2, current_h_res * 3]).reshape((-1, 1))\
+            #             .to(device)
+            #         expanded = largest_h_grid.reshape((*shape[:2], 1, 1)).expand((*shape[:2], len(delta_h), 1))
+            #         expanded = expanded + delta_h
+            #         query_grid = torch.cat([
+            #             query_grid[:, :, 0:1, 0:1].expand((*shape[:2], len(delta_h), 1)),
+            #             query_grid[:, :, 0:1, 1:2].expand((*shape[:2], len(delta_h), 1)),
+            #             expanded
+            #         ], 3)
 
         return largest_h_grid, is_empty
 
     def _eval_points(self, p, c, **kwargs):
         p_split = torch.split(p, self.points_batch_size)
-        occ_hats = []
+        pred_h = []
+        # occ_hats = []
         for pi in p_split:
             pi = pi.unsqueeze(0).to(self.device)
             with torch.no_grad():
                 pred = self.model.decode(pi, c, **kwargs)
-                occ_hat = self.model.pred2occ(pred)
-                occ_hat = occ_hat > 0
-            occ_hats.append(occ_hat.squeeze(0).detach())
-        occ_hat = torch.cat(occ_hats, dim=0)
-        return occ_hat
+                # occ_hat = self.model.pred2occ(pred)
+                # occ_hat = occ_hat > 0
+            pred_h.append(pred.squeeze(0).detach())
+        pred_h = torch.cat(pred_h, dim=0)
+        return pred_h

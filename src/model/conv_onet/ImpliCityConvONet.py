@@ -75,13 +75,13 @@ class ImpliCityONet(nn.Module):
         pred = self.decoder(p, feature_planes, **kwargs)
         return pred
 
-    def pred2occ(self, decoded_pred):
-        if self.multi_class:
-            _, pred_occ = torch.max(decoded_pred, -1)
-        else:
-            pred_bernoulli = torch.distributions.Bernoulli(logits=decoded_pred)
-            pred_occ = (pred_bernoulli.probs >= self.threshold).float()
-        return pred_occ
+    # def pred2occ(self, decoded_pred):
+    #     if self.multi_class:
+    #         _, pred_occ = torch.max(decoded_pred, -1)
+    #     else:
+    #         pred_bernoulli = torch.distributions.Bernoulli(logits=decoded_pred)
+    #         pred_occ = (pred_bernoulli.probs >= self.threshold).float()
+    #     return pred_occ
 
     def to(self, device):
         """ Puts the model to the device.

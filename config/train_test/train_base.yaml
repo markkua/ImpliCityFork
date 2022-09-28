@@ -3,7 +3,7 @@
 dataset:
 # Full training data
   name: ImpliCity
-  path: data/ImpliCity
+  path: data/ImpliCity_Height
   dsm_gt_path: data/source_data/ZUR1/Ground_Truth_2.5D/Zurich_ROI1_GT_UTM_32N_ellipsoidal_h_GRS80.tif
   mask_files:
     gt: data/source_data/ZUR1/Masks/Zurich_ROI1_ground_truth_mask_UTM_32N.tif
@@ -72,6 +72,7 @@ model:
   multi_label: False  # False: binary occupancy, True: 0-unoccupied, 1-building, 2-terrain
 
 training:
+  wandb_proj: ImpliCity_Regress
   run_name: train_base
   out_dir: out
   resume_from: null

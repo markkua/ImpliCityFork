@@ -37,6 +37,7 @@ from src.Trainer import Trainer
 from src.utils.libconfig import config_logging
 from src.loss import wrapped_bce, wrapped_cross_entropy
 
+
 # -------------------- Initialization --------------------
 matplotlib.use('Agg')
 
@@ -82,6 +83,7 @@ model_selection_metric = cfg_training['model_selection_metric']
 
 print_every = cfg_training['print_every']
 visualize_every = cfg_training['visualize_every']
+save_vis_every = cfg_training['save_vis_every']
 validate_every = cfg_training['validate_every']
 checkpoint_every = cfg_training['checkpoint_every']
 backup_every = cfg_training['backup_every']
@@ -120,7 +122,7 @@ if not os.path.exists(_wandb_out_dir):
 if args.no_wandb:
     wandb.init(mode='disabled')
 else:
-    wandb.init(project='PROJECT_NAME',
+    wandb.init(project=cfg_training['wandb_proj'],
                config=cfg,
                name=os.path.basename(out_dir_run),
                dir=_wandb_out_dir,
@@ -170,7 +172,28 @@ model = get_model(cfg, device)
 wandb.watch(model)
 
 # %% -------------------- Optimizer --------------------
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+freeze_lr = 0.
+if cfg_training['pretrained_encoder']:
+    optimizer = optim.Adam(
+        [
+            {'params': model.point_encoder.parameters(), 'lr': freeze_lr},  # Point cloud encoder
+            {'params': model.image_encoder.parameters(), 'lr': freeze_lr},  # Image encoder
+            # Decoder
+            {'params': model.decoder.fc_p.parameters()},
+            {'params': model.decoder.fc_c.parameters()},
+            {'params': model.decoder.blocks.parameters()},
+            {'params': model.decoder.fc_out.parameters()},
+        ],
+        lr=learning_rate
+    )
+
+    # TODO: initialize decoder parameters
+
+
+else:
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+
 
 # Scheduler
 cfg_scheduler = cfg_training['scheduler']
@@ -193,10 +216,18 @@ else:
 
 # %% -------------------- Trainer --------------------
 # Loss
-if cfg_multi_class:
-    criteria = wrapped_cross_entropy
+_loss_str = cfg_training['loss']
+if _loss_str == 'MAE':
+    criteria = torch.nn.L1Loss()
+elif _loss_str == 'MSE':
+    criteria = torch.nn.MSELoss()
 else:
-    criteria = wrapped_bce
+    raise ValueError(f"Unknown loss type: {_loss_str}")
+
+# if cfg_multi_class:
+#     criteria = wrapped_cross_entropy
+# else:
+#     criteria = wrapped_bce
 
 trainer = Trainer(model=model, optimizer=optimizer, criteria=criteria, device=device,
                   optimize_every=cfg_training['optimize_every'], cfg_loss_weights=cfg_training['loss_weights'],
@@ -251,7 +282,8 @@ else:
     _msg = 'model_selection_mode must be either maximize or minimize.'
     logging.error(_msg)
     raise ValueError(_msg)
-metric_val_best = load_dict.get('loss_val_best', -model_selection_sign * np.inf)
+# metric_val_best = load_dict.get('loss_val_best', -model_selection_sign * np.inf)
+metric_val_best = -model_selection_sign * np.inf
 logging.info(f"Current best validation metric = {metric_val_best:.8f}")
 
 # %% -------------------- Training iterations --------------------
@@ -260,9 +292,11 @@ logging.info(f"Total number of parameters = {n_parameters}")
 logging.info(f"output path: '{out_dir_run}'")
 
 
-def visualize():
+def visualize(save_tiff=True):
     _output_path = os.path.join(out_dir_tiff, f"{pure_run_name}_dsm_{n_iter:06d}.tiff")
-    dsm_writer = generator_dsm.generate_dsm(_output_path)
+    dsm_writer = generator_dsm.generate_dsm()
+    if save_tiff:
+        dsm_writer.write_to_file(_output_path)
     logging.info(f"DSM saved to '{_output_path}'")
     _target_dsm = dsm_writer.get_data()
     # evaluate dsm
@@ -274,7 +308,8 @@ def visualize():
     # residual
     dsm_writer.set_data(diff_arr)
     _output_path = os.path.join(out_dir_tiff, f"{pure_run_name}_residual_{n_iter:06d}.tiff")
-    dsm_writer.write_to_file(_output_path)
+    if save_tiff:
+        dsm_writer.write_to_file(_output_path)
     logging.info(f"DSM residual saved to '{_output_path}")
     _dsm_log_dic = {f'DSM/{k}/{k2}': v2 for k, v in output_dic.items() for k2, v2 in v.items()}
     wandb.log(_dsm_log_dic, step=n_iter)
@@ -357,7 +392,8 @@ try:
 
                 # Visualization
                 if visualize_every > 0 and (n_iter % visualize_every) == 0:
-                    visualize()
+                    _save_tiff = (n_iter % save_vis_every) == 0
+                    visualize(save_tiff=_save_tiff)
 
                 # Exit if necessary
                 if 0 < exit_after <= (datetime.now() - t_start).total_seconds():
