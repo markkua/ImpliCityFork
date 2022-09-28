@@ -24,6 +24,7 @@ building reconstruction, featuring intricate roof details, smooth surfaces, and 
 The code has been developed and tested with:
 * Ubuntu 20.04.4 LTS, Python 3.8.10, PyTorch 1.10.0, CUDA 10.2
 
+(TODO: only for myself, build data on Python 3.6 and train on Python 3.8)
 
 ## Installation
 
