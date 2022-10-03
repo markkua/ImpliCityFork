@@ -91,7 +91,7 @@ class GridIndexPointCloud:
 
         if 0 == len(grid_idx_ls):
             logging.warning(f"Empty point cloud cropping: p_min={p_min}, p_max={p_max}")
-            return np.empty()
+            return np.empty(0)
 
         # get all point index in these grids
         point_idx_ls = [self.index_dict[idx] for idx in grid_idx_ls]
