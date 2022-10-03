@@ -1,5 +1,5 @@
 # Basic info
-inherit_from: config/data/ImpliCity/ImpliCity_base.yaml
+inherit_from: config/dataset/ImpliCity/ImpliCity_base.yaml
 
 # Output
 output:

@@ -18,7 +18,7 @@ except ImportError:
 from torch.utils import data
 from tqdm import tqdm
 
-from src.utils.libpc import crop_pc_2d, crop_pc_2d_index
+from src.utils.libpc import crop_pc_2d, crop_pc_2d_index, GridIndexPointCloud
 from src.utils.libcoord.coord_transform import invert_transform, apply_transform
 from src.io.RasterIO import RasterReader, RasterData
 
@@ -58,7 +58,7 @@ class ImpliCityDataset(data.Dataset):
     CHUNK_INFO = "chunk_info.yaml"
 
     def __init__(self, split: str, cfg_dataset: Dict, random_sample=False, merge_query_occ: bool = True,
-                 random_length=None, flip_augm=False, rotate_augm=False):
+                 random_length=None, flip_augm=False, rotate_augm=False, index_grid_size=[16, 16]):
         """
         Args:
             split: 'train', 'val', 'test', 'vis'
@@ -79,6 +79,7 @@ class ImpliCityDataset(data.Dataset):
         if self.split in ['val'] and not cfg_dataset.get('subsample_val', False):
             self._n_query_pts = None
         self.patch_size = torch.tensor(cfg_dataset['patch_size'], dtype=torch.float64)
+        self.index_grid_size = np.array(index_grid_size)
 
         # initialize
         self.images: List[RasterData] = []
@@ -127,10 +128,14 @@ class ImpliCityDataset(data.Dataset):
 
             # input points
             inputs = np.load(os.path.join(chunk_full_path, self.INPUT_POINT_CLOUD))
+            inputs_idx_pc = GridIndexPointCloud(inputs['pts'])
+            inputs_idx_pc.create_index_grid_2d(self.index_grid_size)
+            del inputs
 
             chunk_data = {
                 'name': chunk_name,
-                'inputs': torch.from_numpy(inputs['pts']).double(),
+                # 'inputs': torch.from_numpy(inputs['pts']).double(),
+                'inputs_idx_pc': inputs_idx_pc
             }
 
             # query points
@@ -155,8 +160,13 @@ class ImpliCityDataset(data.Dataset):
                 if merge_query_occ:
                     query_occ = (query_occ > 0).astype(bool)
                 del query_pts_ls, query_occ_ls, masks_ls
+
+                query_pts_idx_pc = GridIndexPointCloud(query_pts)
+                query_pts_idx_pc.create_index_grid_2d(self.index_grid_size)
+
                 chunk_data.update({
-                    'query_pts': torch.from_numpy(query_pts).double(),
+                    'query_idx_pc': query_pts_idx_pc,
+                    # 'query_pts': torch.from_numpy(query_pts).double(),
                     'query_occ': torch.from_numpy(query_occ).float(),
                     'mask_gt': torch.from_numpy(masks['mask_gt']).bool(),
                     'mask_building': torch.from_numpy(masks['mask_building']).bool(),
@@ -256,7 +266,10 @@ class ImpliCityDataset(data.Dataset):
         # -------------------- Input point cloud --------------------
         # Crop inputs
         chunk_data = self.data_dic[chunk_idx]
-        inputs, _ = crop_pc_2d(chunk_data['inputs'], min_bound, max_bound)
+        # inputs, _ = crop_pc_2d(chunk_data['inputs'], min_bound, max_bound)
+        inputs, _ = chunk_data['inputs_idx_pc'].crop_2d(min_bound, max_bound)
+        inputs = torch.from_numpy(inputs).double()
+
         shift_strategy = self._cfg_data['normalize']['z_shift']
         if 'median' == shift_strategy:
             z_shift = torch.median(inputs[:, 2]).double().reshape(1)
@@ -327,7 +340,9 @@ class ImpliCityDataset(data.Dataset):
         # -------------------- Query points --------------------
         if self.split in ['train', 'val']:
             # Crop query points
-            points, points_idx = crop_pc_2d(chunk_data['query_pts'], min_bound, max_bound)
+            # points, points_idx = crop_pc_2d(chunk_data['query_pts'], min_bound, max_bound)
+            points, points_idx = chunk_data['query_idx_pc'].crop_2d(min_bound, max_bound)
+            points = torch.from_numpy(points).double()
             # print('points, first point: ', points[0])
             # print('diff: ', points[0] - torch.cat([min_bound, z_shift]))
             # Normalize query points

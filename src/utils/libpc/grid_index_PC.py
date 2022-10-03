@@ -1,5 +1,7 @@
 import os
 from typing import List
+
+import torch
 from tqdm import tqdm
 import numpy as np
 import laspy
@@ -59,20 +61,21 @@ class GridIndexPointCloud:
         del point_grid_index
         group_by = df.groupby('grid_index')
 
-        self.index_dict.update({k: v.index.tolist() for k, v in group_by})
+        self.index_dict.update({k: np.array(v.index).astype(int) for k, v in group_by})
         del df
 
         self._index_created = True
         logging.debug(f"Index grid created, dimension = {self._grid_dimension}")
         return
 
-    def crop_pc_2d(self, p_min, p_max):
+    def crop_2d_index(self, p_min, p_max):
         if not self._index_created:
             logging.warning(f"Query fail! Create index grid first")
             return None
-
         # calculate indices of grids that touch the cropping ROI
-        corners = np.array([p_min[:2], p_max[:2]]).reshape((2, 2))
+        p_min = np.array(p_min[:2])
+        p_max = np.array(p_max[:2])
+        corners = np.array([p_min, p_max]).reshape((2, 2))
         corner_idx = self._get_index_num(corners)
 
         col = corner_idx % self._grid_dimension[1]
@@ -84,6 +87,12 @@ class GridIndexPointCloud:
         _xv, _yv = np.meshgrid(rows, cols)
         grid_idx_ls = _xv.reshape(-1) * self._grid_dimension[1] + _yv.reshape(-1)
 
+        grid_idx_ls = [x for x in grid_idx_ls if 0 <= x < self._grid_num]
+
+        if 0 == len(grid_idx_ls):
+            logging.warning(f"Empty point cloud cropping: p_min={p_min}, p_max={p_max}")
+            return np.empty()
+
         # get all point index in these grids
         point_idx_ls = [self.index_dict[idx] for idx in grid_idx_ls]
         point_idx_ls = np.concatenate(point_idx_ls).reshape(-1)
@@ -93,7 +102,11 @@ class GridIndexPointCloud:
         out_idx = np.where((points_in_grid[:, 0] > p_min[0]) & (points_in_grid[:, 0] < p_max[0]) &
                            (points_in_grid[:, 1] > p_min[1]) & (points_in_grid[:, 1] < p_max[1]))[0]
 
-        return points_in_grid[out_idx]
+        return point_idx_ls[out_idx].copy()
+
+    def crop_2d(self, p_min, p_max):
+        idx = self.crop_2d_index(p_min, p_max)
+        return self.pts[idx].copy(), idx
 
     def _get_index_num(self, pts):
         point_grid_index = np.floor((pts[:, 0] - self._p_min[0]) / self.grid_size[0]) * self._grid_dimension[1]\
@@ -132,7 +145,12 @@ if __name__ == '__main__':
 
     # instance
     grid_idx_pc = GridIndexPointCloud(merged_pts)
-    grid_idx_pc.create_index_grid_2d((32, 32))
+    # grid_idx_pc.create_index_grid_2d((32, 32))  # 64 iters/ses
+    grid_idx_pc.create_index_grid_2d((16, 16))  # 92 iters/sec
+    # grid_idx_pc.create_index_grid_2d((8, 8))  # 110 iters/sec
+    # grid_idx_pc.create_index_grid_2d((4, 4))  # 120 iters/sec
+    # grid_idx_pc.create_index_grid_2d((2, 2))  # 120 iters/sec
+
 
     print(f"grid dimension: {grid_idx_pc._grid_dimension}")
 
@@ -142,7 +160,7 @@ if __name__ == '__main__':
 
     print(f"cropping from {crop_p_min} to {crop_p_max}")
 
-    cropped_pc = grid_idx_pc.crop_pc_2d(crop_p_min, crop_p_max)
+    cropped_pc, _ = grid_idx_pc.crop_2d(crop_p_min, crop_p_max)
 
     print(f"cropped shape: {cropped_pc.shape}")
     print(f"cropped min: {cropped_pc.min(axis=0)}")
@@ -161,12 +179,12 @@ if __name__ == '__main__':
 
     # test speed
     for i in tqdm(range(10000), desc="index"):
-        cropped_pc = grid_idx_pc.crop_pc_2d(crop_p_min, crop_p_max)
+        cropped_pc = grid_idx_pc.crop_2d(crop_p_min, crop_p_max)
 
-    for i in tqdm(range(100), desc="looping"):
-        gt_pc_idx = np.where((merged_pts[:, 0] > crop_p_min[0]) & (merged_pts[:, 0] < crop_p_max[0]) &
-                             (merged_pts[:, 1] > crop_p_min[1]) & (merged_pts[:, 1] < crop_p_max[1]))[0]
-        gt_pc = merged_pts[gt_pc_idx]
+    # for i in tqdm(range(100), desc="looping"):
+    #     gt_pc_idx = np.where((merged_pts[:, 0] > crop_p_min[0]) & (merged_pts[:, 0] < crop_p_max[0]) &
+    #                          (merged_pts[:, 1] > crop_p_min[1]) & (merged_pts[:, 1] < crop_p_max[1]))[0]
+    #     gt_pc = merged_pts[gt_pc_idx]
 
 
 

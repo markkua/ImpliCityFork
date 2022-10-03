@@ -6,6 +6,7 @@
 from .PCTransforms import PointCloudNormalizer, PointCloudSubsampler, ShiftPoints
 from .crop_pc import crop_pc_3d, crop_pc_2d, crop_pc_2d_index
 from .pc_io import save_pc_to_ply, load_pc, load_las_as_numpy
+from .grid_index_PC import GridIndexPointCloud
 
 
 if __name__ == '__main__':

@@ -4,7 +4,10 @@ inherit_from: config/train_test/ImpliCity-mono.yaml
 
 dataset:
   satellite_image:  # orthorectified
-    pairs: ['18JAN29104120-P1BS-502980288020_01_P005_demo.tif', '18MAR24105605-P1BS-501687882040_02_P006_demo.tif']  # stereo
+    folder: data/source_data/ZUR1/Orthorectified_PAN
+#    pairs: ['18JAN29104120-P1BS-502980288020_01_P005_demo.tif', '18MAR24105605-P1BS-501687882040_02_P006_demo.tif']  # stereo
+    pairs: ['18JAN29104120-P1BS-502980288020_01_P005.tif', '18MAR24105605-P1BS-501687882040_02_P006.tif']  # stereo
+
 
 model:
   encoder2_kwargs:
